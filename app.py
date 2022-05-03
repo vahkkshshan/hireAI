@@ -201,7 +201,7 @@ async def create_user(username: str = Form(None), company: str = Form(None), pas
     # print(user_object["password"])
 
     user_id = await db["users"].insert_one(user)
-    created_user= await db["users"].find_one({"_id": user_id.inserted_id})
+    created_user = await db["users"].find_one({"_id": user_id.inserted_id})
     # print(user)
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_user)
 
@@ -273,6 +273,17 @@ async def show_candidate(id: str):
         return candidate
 
     raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
+
+
+@app.get(
+    "/interview/{id}", response_description="Get a single interview", response_model=InterviewModel
+)
+async def show_interview(id: str):
+    if (interview :=  db["interview"].find_one({"_id": id})) is not None:
+        print(interview)
+        return interview
+
+    raise HTTPException(status_code=404, detail=f"Interview {id} not found")
 
 
 @app.put("/candidate/{id}", response_description="Update a candidate", response_model=CandidateModel)
