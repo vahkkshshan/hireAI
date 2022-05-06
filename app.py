@@ -261,7 +261,7 @@ async def create_candidate(username: str = Form(None), email: EmailStr = Form(No
     #         return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_candidate)
 
 
-@app.post("/candidate/cv_upload/{username}", response_description="Upload cv", response_model=UpdateCandidateModel)
+@app.post("/candidate/cv_upload/{username}", response_description="Upload cv")
 async def upload_cv(username: str, cv: UploadFile = File(None)):
     if cv is not None:
         upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
@@ -277,12 +277,36 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
                     if (
                             updated_candidate := db["candidate"].find_one({"username": username})
                     ) is not None:
-                        return updated_candidate
+                        return cv.filename
 
-            if (existing_candidate :=  db["candidate"].find_one({"username": username})) is not None:
-                return existing_candidate
+            if (existing_candidate := db["candidate"].find_one({"username": username})) is not None:
+                return cv.filename
 
             raise HTTPException(status_code=404, detail=f"Candidate {username} not found")
+
+
+# @app.post("/interview/apply/{interview_id}/{username}", response_description="Apply job", response_model=UpdateCandidateModel)
+# async def upload_cv(username: str, cv: UploadFile = File(None)):
+#     if cv is not None:
+#         upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
+#         if upload_obj:
+#
+#             candidate = UpdateCandidateModel(cv="https://vk26bucket.s3.ap-south-1.amazonaws.com/cv" + cv.filename)
+#             candidate = {k: v for k, v in candidate.dict().items() if v is not None}
+#
+#             if len(candidate) >= 1:
+#                 update_result = db["candidate"].update_one({"username": username}, {"$set": candidate})
+#
+#                 if update_result.modified_count == 1:
+#                     if (
+#                             updated_candidate := db["candidate"].find_one({"username": username})
+#                     ) is not None:
+#                         return updated_candidate
+#
+#             if (existing_candidate :=  db["candidate"].find_one({"username": username})) is not None:
+#                 return existing_candidate
+#
+#             raise HTTPException(status_code=404, detail=f"Candidate {username} not found")
 
 
 @app.post("/interview", response_description="Add new interview", response_model=InterviewModel)
