@@ -116,8 +116,9 @@ class CandidateModel(BaseModel):
     name: str = Field(...)
     email: EmailStr = Field(...)
     position: str = Field(...)
-    cv: str = Field(...)
-    interview: List[InterviewInfo]
+    password: str = Field(...)
+    cv: Optional[str] = Field(...)
+    interview: Optional[List[InterviewInfo]]
 
     class Config:
         allow_population_by_field_name = True
@@ -137,6 +138,7 @@ class UpdateCandidateModel(BaseModel):
     name: Optional[str]
     email: Optional[EmailStr]
     position: Optional[str]
+    password: Optional[str]
     cv: Optional[str]
 
     class Config:
@@ -152,33 +154,33 @@ class UpdateCandidateModel(BaseModel):
         }
 
 
-class StudentModel(BaseModel):
-    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
-    name: str = Field(...)
-    email: EmailStr = Field(...)
-    course: str = Field(...)
-    gpa: float = Field(..., le=4.0)
-
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
-        schema_extra = {
-            "example": {
-                "name": "Jane Doe",
-                "email": "jdoe@example.com",
-                "course": "Experiments, Science, and Fashion in Nanophotonics",
-                "gpa": "3.0",
-            }
-        }
-
-
-@app.post("/st", response_description="Add new student", response_model=StudentModel)
-async def create_student(student: StudentModel = Body(...)):
-    student = jsonable_encoder(student)
-    new_student = await db["students"].insert_one(student)
-    created_student = await db["students"].find_one({"_id": new_student.inserted_id})
-    return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_student)
+# class StudentModel(BaseModel):
+#     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+#     name: str = Field(...)
+#     email: EmailStr = Field(...)
+#     course: str = Field(...)
+#     gpa: float = Field(..., le=4.0)
+#
+#     class Config:
+#         allow_population_by_field_name = True
+#         arbitrary_types_allowed = True
+#         json_encoders = {ObjectId: str}
+#         schema_extra = {
+#             "example": {
+#                 "name": "Jane Doe",
+#                 "email": "jdoe@example.com",
+#                 "course": "Experiments, Science, and Fashion in Nanophotonics",
+#                 "gpa": "3.0",
+#             }
+#         }
+#
+#
+# @app.post("/st", response_description="Add new student", response_model=StudentModel)
+# async def create_student(student: StudentModel = Body(...)):
+#     student = jsonable_encoder(student)
+#     new_student = await db["students"].insert_one(student)
+#     created_student = await db["students"].find_one({"_id": new_student.inserted_id})
+#     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_student)
 
 
 @app.get("/")
@@ -200,8 +202,8 @@ async def create_user(username: str = Form(None), company: str = Form(None), pas
     # user_object["password"] = hashed_pass
     # print(user_object["password"])
 
-    user_id = await db["users"].insert_one(user)
-    created_user = await db["users"].find_one({"_id": user_id.inserted_id})
+    user_id = db["users"].insert_one(user)
+    created_user = db["users"].find_one({"_id": user_id.inserted_id})
     # print(user)
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_user)
 
@@ -209,23 +211,36 @@ async def create_user(username: str = Form(None), company: str = Form(None), pas
 @app.post('/login')
 async def login(request: OAuth2PasswordRequestForm = Depends()):
     user = db["users"].find_one({"username": request.username})
+    role = "admin"
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f'No user found with this {request.username} username')
+        user = db["candidate"].find_one({"username": request.username})
+        role = "candidate"
+
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail=f'No user found with this {request.username} username')
     if not Hash.verify(user["password"], request.password):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Wrong Username or password')
-    access_token = create_access_token(data={"username": user["username"]})
+    access_token = create_access_token(data={"username": user["username"], "role": role})
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.post("/candidate", response_description="Add new candidate", response_model=CandidateModel)
 async def create_candidate(name: str = Form(None), email: EmailStr = Form(None), position: str = Form(None),
+                           password: str = Form(None),
                            cv: UploadFile = File(...),
                            interview_name: str = Query(None, enum=list(db["interview"].find()))):
     print("hey")
     ins = list(db["interview"].find())
     print(ins)
     print(interview_name[1])
+    hashed_pass = Hash.bcrypt(password)
+    candidate = CandidateModel(name=name, email=email, position=position, password=hashed_pass)
+    print(candidate)
+    candidate = jsonable_encoder(candidate)
+    new_candidate = await db["candidate"].insert_one(candidate)
+    created_candidate = await db["candidate"].find_one({"_id": new_candidate.inserted_id})
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_candidate)
 
     # upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
     # if upload_obj:
@@ -243,7 +258,7 @@ async def create_candidate(name: str = Form(None), email: EmailStr = Form(None),
     #         candidate = jsonable_encoder(candidate)
     #         new_candidate = await db["candidate"].insert_one(candidate)
     #         created_candidate = await db["candidate"].find_one({"_id": new_candidate.inserted_id})
-    #     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_candidate)
+    #         return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_candidate)
 
 
 @app.post("/interview", response_description="Add new interview", response_model=InterviewModel)
@@ -279,7 +294,7 @@ async def show_candidate(id: str):
     "/interview/{id}", response_description="Get a single interview", response_model=InterviewModel
 )
 async def show_interview(id: str):
-    if (interview :=  db["interview"].find_one({"_id": id})) is not None:
+    if (interview := db["interview"].find_one({"_id": id})) is not None:
         print(interview)
         return interview
 
