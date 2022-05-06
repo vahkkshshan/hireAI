@@ -261,6 +261,30 @@ async def create_candidate(username: str = Form(None), email: EmailStr = Form(No
     #         return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_candidate)
 
 
+@app.post("/candidate/cv_upload/{username}", response_description="Upload cv", response_model=UpdateCandidateModel)
+async def upload_cv(username: str, cv: UploadFile = File(None)):
+    if cv is not None:
+        upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
+        if upload_obj:
+
+            candidate = UpdateCandidateModel(cv="https://vk26bucket.s3.ap-south-1.amazonaws.com/cv" + cv.filename)
+            candidate = {k: v for k, v in candidate.dict().items() if v is not None}
+
+            if len(candidate) >= 1:
+                update_result = await db["candidate"].update_one({"username": username}, {"$set": candidate})
+
+                if update_result.modified_count == 1:
+                    if (
+                            updated_candidate := await db["candidate"].find_one({"_id": id})
+                    ) is not None:
+                        return updated_candidate
+
+            if (existing_candidate := await db["candidate"].find_one({"_id": id})) is not None:
+                return existing_candidate
+
+            raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
+
+
 @app.post("/interview", response_description="Add new interview", response_model=InterviewModel)
 async def create_interview(name: str = Form(None), vacancy: int = Form(None)):
     print("hey")
@@ -302,22 +326,36 @@ async def show_interview(id: str):
 
 
 @app.put("/candidate/{id}", response_description="Update a candidate", response_model=CandidateModel)
-async def update_candidate(id: str, candidate: UpdateCandidateModel = Body(...)):
-    candidate = {k: v for k, v in candidate.dict().items() if v is not None}
+async def update_candidate(id: str, username: str = Form(None), password: str = Form(None), email: str = Form(None),
+                           position: str = Form(None),
+                           cv: UploadFile = File(None)):
+    if cv is not None:
+        upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
+        if upload_obj:
+            # query = {"name": interview_name}
+            # add_interview = db["interview"].find_one(query)
+            # print(add_interview["name"])
+            # for doc in add_interview:
+            #     print(doc)
+            # if add_interview['vacancy'] is not 0:
+            #     interview_info = InterviewInfo(interview_id=add_interview['_id'], interview_name=add_interview['name'])
+            candidate = UpdateCandidateModel(username=username, email=email, position=position,
+                                             cv="https://vk26bucket.s3.ap-south-1.amazonaws.com/cv" + cv.filename)
+            candidate = {k: v for k, v in candidate.dict().items() if v is not None}
 
-    if len(candidate) >= 1:
-        update_result = await db["candidate"].update_one({"_id": id}, {"$set": candidate})
+            if len(candidate) >= 1:
+                update_result = await db["candidate"].update_one({"_id": id}, {"$set": candidate})
 
-        if update_result.modified_count == 1:
-            if (
-                    updated_candidate := await db["candidate"].find_one({"_id": id})
-            ) is not None:
-                return updated_candidate
+                if update_result.modified_count == 1:
+                    if (
+                            updated_candidate := await db["candidate"].find_one({"_id": id})
+                    ) is not None:
+                        return updated_candidate
 
-    if (existing_candidate := await db["candidate"].find_one({"_id": id})) is not None:
-        return existing_candidate
+            if (existing_candidate := await db["candidate"].find_one({"_id": id})) is not None:
+                return existing_candidate
 
-    raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
+            raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
 
 
 @app.delete("/candidate/{id}", response_description="Delete a candidate")
