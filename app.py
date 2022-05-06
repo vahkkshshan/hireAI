@@ -113,11 +113,11 @@ class InterviewInfo(BaseModel):
 
 class CandidateModel(BaseModel):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
-    name: str = Field(...)
+    username: str = Field(...)
     email: EmailStr = Field(...)
     position: str = Field(...)
     password: str = Field(...)
-    cv: Optional[str] = Field(...)
+    cv: Optional[str]
     interview: Optional[List[InterviewInfo]]
 
     class Config:
@@ -135,7 +135,7 @@ class CandidateModel(BaseModel):
 
 
 class UpdateCandidateModel(BaseModel):
-    name: Optional[str]
+    username: Optional[str]
     email: Optional[EmailStr]
     position: Optional[str]
     password: Optional[str]
@@ -226,20 +226,20 @@ async def login(request: OAuth2PasswordRequestForm = Depends()):
 
 
 @app.post("/candidate", response_description="Add new candidate", response_model=CandidateModel)
-async def create_candidate(name: str = Form(None), email: EmailStr = Form(None), position: str = Form(None),
+async def create_candidate(username: str = Form(None), email: EmailStr = Form(None), position: str = Form(None),
                            password: str = Form(None),
-                           cv: UploadFile = File(...),
+                           cv: UploadFile = File(None),
                            interview_name: str = Query(None, enum=list(db["interview"].find()))):
     print("hey")
     ins = list(db["interview"].find())
     print(ins)
-    print(interview_name[1])
+    # print(interview_name[1])
     hashed_pass = Hash.bcrypt(password)
-    candidate = CandidateModel(name=name, email=email, position=position, password=hashed_pass)
+    candidate = CandidateModel(username=username, email=email, position=position, password=hashed_pass)
     print(candidate)
     candidate = jsonable_encoder(candidate)
-    new_candidate = await db["candidate"].insert_one(candidate)
-    created_candidate = await db["candidate"].find_one({"_id": new_candidate.inserted_id})
+    new_candidate = db["candidate"].insert_one(candidate)
+    created_candidate = db["candidate"].find_one({"_id": new_candidate.inserted_id})
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_candidate)
 
     # upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
