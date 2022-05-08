@@ -344,7 +344,7 @@ async def list_candidates():
     "/candidate/{id}", response_description="Get a single candidate", response_model=CandidateModel
 )
 async def show_candidate(id: str):
-    if (candidate := await db["candidate"].find_one({"_id": id})) is not None:
+    if (candidate := db["candidate"].find_one({"_id": id})) is not None:
         return candidate
 
     raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
