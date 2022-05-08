@@ -89,8 +89,10 @@ class TokenData(BaseModel):
 
 class InterviewModel(BaseModel):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
-    name: str = Field(...)
+    designation: str = Field(...)
     vacancy: int = Field(...)
+    company_name: str = Field(...)
+    description: str = Field(...)
 
     class Config:
         allow_population_by_field_name = True
@@ -109,6 +111,7 @@ class InterviewModel(BaseModel):
 class InterviewInfo(BaseModel):
     interview_id: PyObjectId
     interview_name: str
+    company_name: str
 
 
 class CandidateModel(BaseModel):
@@ -140,6 +143,7 @@ class UpdateCandidateModel(BaseModel):
     position: Optional[str]
     password: Optional[str]
     cv: Optional[str]
+    interview: Optional[List[InterviewInfo]]
 
     class Config:
         arbitrary_types_allowed = True
@@ -285,34 +289,37 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
             raise HTTPException(status_code=404, detail=f"Candidate {username} not found")
 
 
-# @app.post("/interview/apply/{interview_id}/{username}", response_description="Apply job", response_model=UpdateCandidateModel)
-# async def upload_cv(username: str, cv: UploadFile = File(None)):
-#     if cv is not None:
-#         upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
-#         if upload_obj:
-#
-#             candidate = UpdateCandidateModel(cv="https://vk26bucket.s3.ap-south-1.amazonaws.com/cv" + cv.filename)
-#             candidate = {k: v for k, v in candidate.dict().items() if v is not None}
-#
-#             if len(candidate) >= 1:
-#                 update_result = db["candidate"].update_one({"username": username}, {"$set": candidate})
-#
-#                 if update_result.modified_count == 1:
-#                     if (
-#                             updated_candidate := db["candidate"].find_one({"username": username})
-#                     ) is not None:
-#                         return updated_candidate
-#
-#             if (existing_candidate :=  db["candidate"].find_one({"username": username})) is not None:
-#                 return existing_candidate
-#
-#             raise HTTPException(status_code=404, detail=f"Candidate {username} not found")
+@app.post("/interview/apply/{interview_id}/{username}", response_description="Apply job",
+          response_model=UpdateCandidateModel)
+async def apply_interview(interview_id: str, username: str):
+    query = {"_id": {interview_id}}
+    add_interview = db["interview"].find_one(query)
+    print(add_interview)
+    interview_info = InterviewInfo(interview_id=add_interview['_id'], interview_name=add_interview['name'])
+    candidate = UpdateCandidateModel(interview=[interview_info])
+    candidate = {k: v for k, v in candidate.dict().items() if v is not None}
+
+    if len(candidate) >= 1:
+        update_result = db["candidate"].update_one({"username": username}, {"$set": candidate})
+
+        if update_result.modified_count == 1:
+            if (
+                    updated_candidate := db["candidate"].find_one({"username": username})
+            ) is not None:
+                return updated_candidate
+
+    if (existing_candidate := db["candidate"].find_one({"username": username})) is not None:
+        return existing_candidate
+
+    raise HTTPException(status_code=404, detail=f"Interview {interview_id} and {username} not found")
 
 
 @app.post("/interview", response_description="Add new interview", response_model=InterviewModel)
-async def create_interview(name: str = Form(None), vacancy: int = Form(None)):
+async def create_interview(designation: str = Form(None), vacancy: int = Form(None), company_name: str = Form(None),
+                           description: str = Form(None)):
     print("hey")
-    interview = InterviewModel(name=name, vacancy=vacancy)
+    interview = InterviewModel(designation=designation, vacancy=vacancy, company_name=company_name,
+                               description=description)
     print(interview)
     interview = jsonable_encoder(interview)
     new_interview = await db["interview"].insert_one(interview)
