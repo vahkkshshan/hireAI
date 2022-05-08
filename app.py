@@ -116,9 +116,13 @@ class InterviewInfo(BaseModel):
 
 class CandidateModel(BaseModel):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    firstname: str = Field(...)
+    lastname: str = Field(...)
+    contact_number: str = Field(...)
     username: str = Field(...)
     email: EmailStr = Field(...)
-    position: str = Field(...)
+    university: str = Field(...)
+    degree_programme: str = Field(...)
     password: str = Field(...)
     cv: Optional[str]
     interview: Optional[List[InterviewInfo]]
@@ -138,9 +142,13 @@ class CandidateModel(BaseModel):
 
 
 class UpdateCandidateModel(BaseModel):
+    firstname: Optional[str]
+    lastname: Optional[str]
+    contact_number: Optional[str]
     username: Optional[str]
+    university: Optional[str]
+    degree_programme: Optional[str]
     email: Optional[EmailStr]
-    position: Optional[str]
     password: Optional[str]
     cv: Optional[str]
     interview: Optional[List[InterviewInfo]]
@@ -150,10 +158,14 @@ class UpdateCandidateModel(BaseModel):
         json_encoders = {ObjectId: str}
         schema_extra = {
             "example": {
-                "name": "Jane Doe",
+                "username": "Jane Doe",
+                "firstname": "Jane Doe",
+                "lastname": "Jane Doe",
+                "university": "Jane Doe",
+                "degree_programme": "Jane Doe",
+                "contact_number": "Jane Doe",
                 "email": "jdoe@example.com",
-                "course": "Experiments, Science, and Fashion in Nanophotonics",
-                "gpa": "3.0",
+                "password": "Jane Doe"
             }
         }
 
@@ -230,8 +242,10 @@ async def login(request: OAuth2PasswordRequestForm = Depends()):
 
 
 @app.post("/candidate", response_description="Add new candidate", response_model=CandidateModel)
-async def create_candidate(username: str = Form(None), email: EmailStr = Form(None), position: str = Form(None),
-                           password: str = Form(None),
+async def create_candidate(username: str = Form(None), email: EmailStr = Form(None),
+                           password: str = Form(None), firstname: str = Form(None), lastname: str = Form(None),
+                           university: str = Form(None),
+                           contact_number: str = Form(None), degree_programme: str = Form(None),
                            cv: UploadFile = File(None),
                            interview_name: str = Query(None, enum=list(db["interview"].find()))):
     print("hey")
@@ -239,7 +253,9 @@ async def create_candidate(username: str = Form(None), email: EmailStr = Form(No
     print(ins)
     # print(interview_name[1])
     hashed_pass = Hash.bcrypt(password)
-    candidate = CandidateModel(username=username, email=email, position=position, password=hashed_pass)
+    candidate = CandidateModel(username=username, email=email, firstname=firstname, lastname=lastname,
+                               password=hashed_pass,
+                               university=university, contact_number=contact_number, degree_programme=degree_programme)
     print(candidate)
     candidate = jsonable_encoder(candidate)
     new_candidate = db["candidate"].insert_one(candidate)
@@ -362,36 +378,54 @@ async def show_interview(id: str):
 
 
 @app.put("/candidate/{id}", response_description="Update a candidate", response_model=CandidateModel)
-async def update_candidate(id: str, username: str = Form(None), password: str = Form(None), email: str = Form(None),
-                           position: str = Form(None),
-                           cv: UploadFile = File(None)):
-    if cv is not None:
-        upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
-        if upload_obj:
-            # query = {"name": interview_name}
-            # add_interview = db["interview"].find_one(query)
-            # print(add_interview["name"])
-            # for doc in add_interview:
-            #     print(doc)
-            # if add_interview['vacancy'] is not 0:
-            #     interview_info = InterviewInfo(interview_id=add_interview['_id'], interview_name=add_interview['name'])
-            candidate = UpdateCandidateModel(username=username, email=email, position=position,
-                                             cv="https://vk26bucket.s3.ap-south-1.amazonaws.com/cv" + cv.filename)
-            candidate = {k: v for k, v in candidate.dict().items() if v is not None}
+async def update_candidate(id: str, candidate: UpdateCandidateModel = Body(...)):
+    # id: str, username: str = Form(None), password: str = Form(None), email: str = Form(None),
+    # position: str = Form(None),firstname:str = Form(None), lastname:str = Form(None),contact_number:str = Form(None),
+    # university:str = Form(None), degree_programme:str = Form(None),
+    # cv: UploadFile = File(None)
+    candidate = {k: v for k, v in candidate.dict().items() if v is not None}
 
-            if len(candidate) >= 1:
-                update_result = await db["candidate"].update_one({"_id": id}, {"$set": candidate})
+    if len(candidate) >= 1:
+        update_result = await db["candidate"].update_one({"_id": id}, {"$set": candidate})
 
-                if update_result.modified_count == 1:
-                    if (
-                            updated_candidate := await db["candidate"].find_one({"_id": id})
-                    ) is not None:
-                        return updated_candidate
+        if update_result.modified_count == 1:
+            if (
+                    updated_candidate := await db["candidate"].find_one({"_id": id})
+            ) is not None:
+                return updated_candidate
 
-            if (existing_candidate := await db["candidate"].find_one({"_id": id})) is not None:
-                return existing_candidate
+        if (existing_candidate := await db["candidate"].find_one({"_id": id})) is not None:
+            return existing_candidate
 
-            raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
+        raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
+
+# if cv is not None:
+#     upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
+#     if upload_obj:
+#         # query = {"name": interview_name}
+#         # add_interview = db["interview"].find_one(query)
+#         # print(add_interview["name"])
+#         # for doc in add_interview:
+#         #     print(doc)
+#         # if add_interview['vacancy'] is not 0:
+#         #     interview_info = InterviewInfo(interview_id=add_interview['_id'], interview_name=add_interview['name'])
+#         candidate = UpdateCandidateModel(username=username, email=email, position=position,
+#                                          cv="https://vk26bucket.s3.ap-south-1.amazonaws.com/cv" + cv.filename)
+#         candidate = {k: v for k, v in candidate.dict().items() if v is not None}
+#
+#         if len(candidate) >= 1:
+#             update_result = await db["candidate"].update_one({"_id": id}, {"$set": candidate})
+#
+#             if update_result.modified_count == 1:
+#                 if (
+#                         updated_candidate := await db["candidate"].find_one({"_id": id})
+#                 ) is not None:
+#                     return updated_candidate
+#
+#         if (existing_candidate := await db["candidate"].find_one({"_id": id})) is not None:
+#             return existing_candidate
+#
+#         raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
 
 
 @app.delete("/candidate/{id}", response_description="Delete a candidate")
