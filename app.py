@@ -386,15 +386,15 @@ async def update_candidate(id: str, candidate: UpdateCandidateModel = Body(...))
     candidate = {k: v for k, v in candidate.dict().items() if v is not None}
 
     if len(candidate) >= 1:
-        update_result = await db["candidate"].update_one({"_id": id}, {"$set": candidate})
+        update_result = db["candidate"].update_one({"_id": id}, {"$set": candidate})
 
         if update_result.modified_count == 1:
             if (
-                    updated_candidate := await db["candidate"].find_one({"_id": id})
+                    updated_candidate := db["candidate"].find_one({"_id": id})
             ) is not None:
                 return updated_candidate
 
-        if (existing_candidate := await db["candidate"].find_one({"_id": id})) is not None:
+        if (existing_candidate := db["candidate"].find_one({"_id": id})) is not None:
             return existing_candidate
 
         raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
