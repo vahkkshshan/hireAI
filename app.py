@@ -14,6 +14,7 @@ from jwttoken import create_access_token
 from oauth import get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+# from model import predict
 
 app = FastAPI()
 origins = [
@@ -112,6 +113,7 @@ class InterviewInfo(BaseModel):
     interview_id: PyObjectId
     interview_name: str
     company_name: str
+    video_link: str
 
 
 class CandidateModel(BaseModel):
@@ -305,33 +307,38 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
             raise HTTPException(status_code=404, detail=f"Candidate {username} not found")
 
 
-@app.post("/interview/apply/{interview_id}/{username}", response_description="Apply job",
+@app.post("/interview/apply/{interview_id}/{user_id}", response_description="Apply job",
           response_model=UpdateCandidateModel)
-async def apply_interview(interview_id: str, username: str, video: UploadFile = File(None)):
+async def apply_interview(interview_id: str, user_id: str, video: UploadFile = File(None)):
     print("lol here man")
     print(interview_id)
     print(type(interview_id))
     if (add_interview := db["interview"].find_one({"_id": interview_id})) is not None:
         print("lol nnow here man")
         print(add_interview)
-        interview_info = InterviewInfo(interview_id=add_interview['_id'], interview_name=add_interview['designation'],
-                                       company_name=add_interview['company_name'])
-        candidate = UpdateCandidateModel(interview=[interview_info])
-        candidate = {k: v for k, v in candidate.dict().items() if v is not None}
 
-        if len(candidate) >= 1:
-            update_result = db["candidate"].update_one({"username": username}, {"$set": candidate})
+        upload_obj = upload_file_to_bucket(video.file, 'vk26bucket', 'video', video.filename)
+        if upload_obj:
 
-            if update_result.modified_count == 1:
-                if (
-                        updated_candidate := db["candidate"].find_one({"username": username})
-                ) is not None:
-                    return updated_candidate
+            interview_info = InterviewInfo(interview_id=add_interview['_id'],
+                                           interview_name=add_interview['designation'],
+                                           company_name=add_interview['company_name'],
+                                           video_link="https://vk26bucket.s3.ap-south-1.amazonaws.com/video/" + video.filename)
+            candidate = UpdateCandidateModel(interview=[interview_info])
 
-        if (existing_candidate := db["candidate"].find_one({"username": username})) is not None:
-            return existing_candidate
+            candidate = {k: v for k, v in candidate.dict().items() if v is not None}
 
-        raise HTTPException(status_code=404, detail=f"Interview {interview_id} and {username} not found")
+            if len(candidate) >= 1:
+                update_result = db["candidate"].update_one({"_id": user_id}, {"$set": candidate})
+
+                if update_result.modified_count == 1:
+                    if (updated_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
+                        return updated_candidate
+
+                if (existing_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
+                    return existing_candidate
+
+                raise HTTPException(status_code=404, detail=f"Interview {interview_id} and {user_id} not found")
     raise HTTPException(status_code=404, detail=f"Interview {interview_id} not found")
 
 
@@ -398,6 +405,7 @@ async def update_candidate(id: str, candidate: UpdateCandidateModel = Body(...))
             return existing_candidate
 
         raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
+
 
 # if cv is not None:
 #     upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
