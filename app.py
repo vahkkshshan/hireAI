@@ -225,7 +225,7 @@ async def login(request: OAuth2PasswordRequestForm = Depends()):
                                 detail=f'No user found with this {request.username} username')
     if not Hash.verify(user["password"], request.password):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Wrong Username or password')
-    access_token = create_access_token(data={"username": user["username"], "role": role})
+    access_token = create_access_token(data={"username": user["username"], "role": role, "id": user["_id"]})
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -291,27 +291,32 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
 
 @app.post("/interview/apply/{interview_id}/{username}", response_description="Apply job",
           response_model=UpdateCandidateModel)
-async def apply_interview(interview_id: str, username: str):
-    query = {"_id": {interview_id}}
-    add_interview = db["interview"].find_one(query)
-    print(add_interview)
-    interview_info = InterviewInfo(interview_id=add_interview['_id'], interview_name=add_interview['name'])
-    candidate = UpdateCandidateModel(interview=[interview_info])
-    candidate = {k: v for k, v in candidate.dict().items() if v is not None}
+async def apply_interview(interview_id: str, username: str, video: UploadFile = File(None)):
+    print("lol here man")
+    print(interview_id)
+    print(type(interview_id))
+    if (add_interview := db["interview"].find_one({"_id": interview_id})) is not None:
+        print("lol nnow here man")
+        print(add_interview)
+        interview_info = InterviewInfo(interview_id=add_interview['_id'], interview_name=add_interview['designation'],
+                                       company_name=add_interview['company_name'])
+        candidate = UpdateCandidateModel(interview=[interview_info])
+        candidate = {k: v for k, v in candidate.dict().items() if v is not None}
 
-    if len(candidate) >= 1:
-        update_result = db["candidate"].update_one({"username": username}, {"$set": candidate})
+        if len(candidate) >= 1:
+            update_result = db["candidate"].update_one({"username": username}, {"$set": candidate})
 
-        if update_result.modified_count == 1:
-            if (
-                    updated_candidate := db["candidate"].find_one({"username": username})
-            ) is not None:
-                return updated_candidate
+            if update_result.modified_count == 1:
+                if (
+                        updated_candidate := db["candidate"].find_one({"username": username})
+                ) is not None:
+                    return updated_candidate
 
-    if (existing_candidate := db["candidate"].find_one({"username": username})) is not None:
-        return existing_candidate
+        if (existing_candidate := db["candidate"].find_one({"username": username})) is not None:
+            return existing_candidate
 
-    raise HTTPException(status_code=404, detail=f"Interview {interview_id} and {username} not found")
+        raise HTTPException(status_code=404, detail=f"Interview {interview_id} and {username} not found")
+    raise HTTPException(status_code=404, detail=f"Interview {interview_id} not found")
 
 
 @app.post("/interview", response_description="Add new interview", response_model=InterviewModel)
