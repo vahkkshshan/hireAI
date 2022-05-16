@@ -373,7 +373,7 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
         print(angry, disgust, fear, happy, sad, surprise)
 
         facial_score=FacialScore(angry=angry,disgust=disgust,sad=sad,fear=fear,surprise=surprise,happy=happy,neutral=neutral)
-        scores= ScoringInfo(facial_score=facial_score,final_score="hired")
+        scores= ScoringInfo(facial_scores=facial_score,final_score="hired")
 
         upload_obj = upload_file_to_bucket(video.file, 'vk26bucket', 'video', video.filename)
         if upload_obj:
