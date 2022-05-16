@@ -16,7 +16,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 import base64
 
-from model import predict
+# from model import predict
 
 app = FastAPI()
 origins = [
@@ -275,7 +275,7 @@ async def create_candidate(username: str = Form(None), email: EmailStr = Form(No
     hashed_pass = Hash.bcrypt(password)
     candidate = CandidateModel(username=username, email=email, firstname=firstname, lastname=lastname,
                                password=hashed_pass,
-                               university=university, contact_number=contact_number, degree_programme=degree_programme)
+                               university=university, contact_number=contact_number, degree_programme=degree_programme,interview=[])
     print(candidate)
     candidate = jsonable_encoder(candidate)
     new_candidate = db["candidate"].insert_one(candidate)
