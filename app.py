@@ -390,7 +390,7 @@ async def list_candidates():
     "/interview", response_description="List all interview", response_model=List[InterviewModel]
 )
 async def list_interviews():
-    interviews = await db["interview"].find().to_list(1000)
+    interviews =  list(db["interview"].find())
     return interviews
 
 
