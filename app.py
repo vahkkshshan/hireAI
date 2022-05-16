@@ -1,5 +1,10 @@
 import json
 import os
+import shutil
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+import aiofiles
 from fastapi import FastAPI, Body, HTTPException, status, Form, UploadFile, File, Query, Depends
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
@@ -16,7 +21,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 import base64
 
-# from model import predict
+from model import predict
 
 app = FastAPI()
 origins = [
@@ -112,13 +117,13 @@ class InterviewModel(BaseModel):
 
 
 class FacialScore(BaseModel):
-    angry: int
-    disgust: int
-    fear: int
-    happy: int
-    sad: int
-    neutral: int
-    surprise: int
+    angry: float
+    disgust: float
+    fear: float
+    happy: float
+    sad: float
+    neutral: float
+    surprise: float
 
 
 class ScoringInfo(BaseModel):
@@ -275,7 +280,8 @@ async def create_candidate(username: str = Form(None), email: EmailStr = Form(No
     hashed_pass = Hash.bcrypt(password)
     candidate = CandidateModel(username=username, email=email, firstname=firstname, lastname=lastname,
                                password=hashed_pass,
-                               university=university, contact_number=contact_number, degree_programme=degree_programme,interview=[])
+                               university=university, contact_number=contact_number, degree_programme=degree_programme,
+                               interview=[])
     print(candidate)
     candidate = jsonable_encoder(candidate)
     new_candidate = db["candidate"].insert_one(candidate)
@@ -334,10 +340,40 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
     if (add_interview := db["interview"].find_one({"_id": interview_id})) is not None:
         print("lol nnow here man")
         print(add_interview)
+        destination = Path("/Users/vahkksh/Documents/mongodb-with-fastapi/videofile/subject.mp4")
 
-        # content=await video.read()
-        # angry, disgust, fear, happy, sad, surprise = predict(content)
-        # print(angry, disgust, fear, happy, sad, surprise)
+        # async with aiofiles.open("videofile/subject.mp4", 'wb') as out_file:
+        #     content = await video.read()  # async read
+        #     await out_file.write(content)  # async write
+        #     angry, disgust, fear, happy, sad, surprise = predict("/videofile/subject.mp4")
+        #     print(angry, disgust, fear, happy, sad, surprise)
+
+        try:
+            with destination.open("wb") as buffer:
+                shutil.copyfileobj(video.file, buffer)
+        except:
+            print("error")
+
+
+        # finally:
+        #     video.file.close()
+        # tmp_path=Path()
+        # try:
+        #     suffix = Path(video.filename).suffix
+        #     with NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        #         shutil.copyfileobj(video.file, tmp)
+        #         tmp_path = Path(tmp.name)
+        #         print(tmp_path)
+        # finally:
+        #     video.file.close()
+        # content= video.file.read()
+
+        angry, disgust, fear, happy, sad, surprise,neutral = predict(
+            "/Users/vahkksh/Documents/mongodb-with-fastapi/videofile/subject.mp4")
+        print(angry, disgust, fear, happy, sad, surprise)
+
+        facial_score=FacialScore(angry=angry,disgust=disgust,sad=sad,fear=fear,surprise=surprise,happy=happy,neutral=neutral)
+        scores= ScoringInfo(facial_score=facial_score,final_score="hired")
 
         upload_obj = upload_file_to_bucket(video.file, 'vk26bucket', 'video', video.filename)
         if upload_obj:
@@ -345,7 +381,8 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
             interview_info = InterviewInfo(interview_id=add_interview['_id'],
                                            interview_name=add_interview['designation'],
                                            company_name=add_interview['company_name'],
-                                           video_link="https://vk26bucket.s3.ap-south-1.amazonaws.com/video/" + video.filename)
+                                           video_link="https://vk26bucket.s3.ap-south-1.amazonaws.com/video/" + video.filename,
+                                           scores=scores)
             # candidate = UpdateCandidateModel(interview=[interview_info])
 
             interview = {k: v for k, v in interview_info.dict().items() if v is not None}

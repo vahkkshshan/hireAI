@@ -27,4 +27,6 @@ def predict(filename):
     df = video.to_pandas(raw_data)
     df_mean = df.iloc[:, 1:7].mean(axis=0)
     print(df)
-    return df_mean['angry'], df_mean['disgust'], df_mean['fear'], df_mean['happy'], df_mean['sad'], df_mean['surprise']
+    return df_mean['angry'], df_mean['disgust'], df_mean['fear'], df_mean['happy'], df_mean['sad'], df_mean['surprise'], df_mean['neutral']
+
+
