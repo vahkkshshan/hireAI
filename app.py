@@ -524,7 +524,7 @@ async def update_candidate(id: str, candidate: UpdateCandidateModel = Body(...))
 
 @app.delete("/candidate/{id}", response_description="Delete a candidate")
 async def delete_candidate(id: str):
-    delete_result = await db["candidate"].delete_one({"_id": id})
+    delete_result = db["candidate"].delete_one({"_id": id})
 
     if delete_result.deleted_count == 1:
         return JSONResponse(status_code=status.HTTP_204_NO_CONTENT)
