@@ -23,7 +23,7 @@ def predict(filename):
 
     # Analyze video, displaying the output
     detector = FER(mtcnn=True)
-    raw_data = video.analyze(detector, display=True)
+    raw_data = video.analyze(detector, display=False)
     df = video.to_pandas(raw_data)
     df_mean = df.iloc[:, 1:7].mean(axis=0)
     print(df)
