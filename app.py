@@ -16,7 +16,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 import base64
 
-# from model import predict
+from model import predict
 
 app = FastAPI()
 origins = [
@@ -335,9 +335,9 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
         print("lol nnow here man")
         print(add_interview)
 
-        # video_stream = ""
-        # with open(video.file, 'rb') as f_vid:
-        #     video_stream = base64.b64decode(f_vid.read())
+        # content=await video.read()
+        # angry, disgust, fear, happy, sad, surprise = predict(content)
+        # print(angry, disgust, fear, happy, sad, surprise)
 
         upload_obj = upload_file_to_bucket(video.file, 'vk26bucket', 'video', video.filename)
         if upload_obj:
@@ -352,7 +352,10 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
             print(interview)
 
             if len(interview) >= 1:
-                update_result = db["candidate"].update_one({"_id": user_id}, {"$push": {"interview": interview}})
+                update_result = db["candidate"].update_one({"_id": user_id},
+                                                           {"$push": {"interview": {
+                                                               "$ifNull": [{"$concatArrays": ["interview", interview]},
+                                                                           interview]}}})
 
                 if update_result.modified_count == 1:
                     if (updated_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
@@ -390,7 +393,7 @@ async def list_candidates():
     "/interview", response_description="List all interview", response_model=List[InterviewModel]
 )
 async def list_interviews():
-    interviews =  list(db["interview"].find())
+    interviews = list(db["interview"].find())
     return interviews
 
 
@@ -399,7 +402,7 @@ async def list_interviews():
     response_model=List[CandidateModel]
 )
 async def show_applied_candidates(interview_id: str):
-    if candidates := list(db["candidate"].find({"interview":{"$elemMatch":{"interview_id":interview_id}}})):
+    if candidates := list(db["candidate"].find({"interview": {"$elemMatch": {"interview_id": interview_id}}})):
         return candidates
     # if (candidate := db["candidate"].find_one({"_id": id})) is not None:
     #     return candidate
