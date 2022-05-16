@@ -339,7 +339,7 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
     if (add_interview := db["interview"].find_one({"_id": interview_id})) is not None:
         print("lol nnow here man")
         print(add_interview)
-        destination = Path("/Users/vahkksh/Documents/mongodb-with-fastapi/videofile/subject.mp4")
+        destination = Path("videofile/subject.mp4")
 
         # async with aiofiles.open("videofile/subject.mp4", 'wb') as out_file:
         #     content = await video.read()  # async read
@@ -368,7 +368,7 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
         # content= video.file.read()
 
         angry, disgust, fear, happy, sad, surprise = predict(
-            "/Users/vahkksh/Documents/mongodb-with-fastapi/videofile/subject.mp4")
+            "videofile/subject.mp4")
         print(angry, disgust, fear, happy, sad, surprise)
 
         facial_score=FacialScore(angry=angry,disgust=disgust,sad=sad,fear=fear,surprise=surprise,happy=happy)
