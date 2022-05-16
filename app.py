@@ -122,7 +122,6 @@ class FacialScore(BaseModel):
     fear: float
     happy: float
     sad: float
-    neutral: float
     surprise: float
 
 
@@ -368,11 +367,11 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
         #     video.file.close()
         # content= video.file.read()
 
-        angry, disgust, fear, happy, sad, surprise,neutral = predict(
+        angry, disgust, fear, happy, sad, surprise = predict(
             "/Users/vahkksh/Documents/mongodb-with-fastapi/videofile/subject.mp4")
         print(angry, disgust, fear, happy, sad, surprise)
 
-        facial_score=FacialScore(angry=angry,disgust=disgust,sad=sad,fear=fear,surprise=surprise,happy=happy,neutral=neutral)
+        facial_score=FacialScore(angry=angry,disgust=disgust,sad=sad,fear=fear,surprise=surprise,happy=happy)
         scores= ScoringInfo(facial_score=facial_score,final_score="hired")
 
         upload_obj = upload_file_to_bucket(video.file, 'vk26bucket', 'video', video.filename)
