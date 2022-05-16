@@ -352,10 +352,12 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
             print(interview)
 
             if len(interview) >= 1:
+                # update_result = db["candidate"].update_one({"_id": user_id},
+                #                                            {"$push": {"interview": {
+                #                                                "$ifNull": [{"$concatArrays": ["interview", interview]},
+                #                                                            interview]}}})
                 update_result = db["candidate"].update_one({"_id": user_id},
-                                                           {"$push": {"interview": {
-                                                               "$ifNull": [{"$concatArrays": ["interview", interview]},
-                                                                           interview]}}})
+                                                           {"$push": {"interview": interview}})
 
                 if update_result.modified_count == 1:
                     if (updated_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
