@@ -14,6 +14,8 @@ from jwttoken import create_access_token
 from oauth import get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+import base64
+
 # from model import predict
 
 app = FastAPI()
@@ -109,11 +111,27 @@ class InterviewModel(BaseModel):
         }
 
 
+class FacialScore(BaseModel):
+    angry: int
+    disgust: int
+    fear: int
+    happy: int
+    sad: int
+    neutral: int
+    surprise: int
+
+
+class ScoringInfo(BaseModel):
+    facial_scores: FacialScore
+    final_score: str
+
+
 class InterviewInfo(BaseModel):
-    interview_id: PyObjectId
+    interview_id: str
     interview_name: str
     company_name: str
     video_link: str
+    scores: Optional[ScoringInfo]
 
 
 class CandidateModel(BaseModel):
@@ -289,7 +307,7 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
         upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
         if upload_obj:
 
-            candidate = UpdateCandidateModel(cv="https://vk26bucket.s3.ap-south-1.amazonaws.com/cv" + cv.filename)
+            candidate = UpdateCandidateModel(cv="https://vk26bucket.s3.ap-south-1.amazonaws.com/cv/" + cv.filename)
             candidate = {k: v for k, v in candidate.dict().items() if v is not None}
 
             if len(candidate) >= 1:
@@ -317,6 +335,10 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
         print("lol nnow here man")
         print(add_interview)
 
+        # video_stream = ""
+        # with open(video.file, 'rb') as f_vid:
+        #     video_stream = base64.b64decode(f_vid.read())
+
         upload_obj = upload_file_to_bucket(video.file, 'vk26bucket', 'video', video.filename)
         if upload_obj:
 
@@ -324,12 +346,13 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
                                            interview_name=add_interview['designation'],
                                            company_name=add_interview['company_name'],
                                            video_link="https://vk26bucket.s3.ap-south-1.amazonaws.com/video/" + video.filename)
-            candidate = UpdateCandidateModel(interview=[interview_info])
+            # candidate = UpdateCandidateModel(interview=[interview_info])
 
-            candidate = {k: v for k, v in candidate.dict().items() if v is not None}
+            interview = {k: v for k, v in interview_info.dict().items() if v is not None}
+            print(interview)
 
-            if len(candidate) >= 1:
-                update_result = db["candidate"].update_one({"_id": user_id}, {"$set": candidate})
+            if len(interview) >= 1:
+                update_result = db["candidate"].update_one({"_id": user_id}, {"$push": {"interview": interview}})
 
                 if update_result.modified_count == 1:
                     if (updated_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
@@ -350,8 +373,8 @@ async def create_interview(designation: str = Form(None), vacancy: int = Form(No
                                description=description)
     print(interview)
     interview = jsonable_encoder(interview)
-    new_interview = await db["interview"].insert_one(interview)
-    created_interview = await db["interview"].find_one({"_id": new_interview.inserted_id})
+    new_interview = db["interview"].insert_one(interview)
+    created_interview = db["interview"].find_one({"_id": new_interview.inserted_id})
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_interview)
 
 
@@ -359,8 +382,29 @@ async def create_interview(designation: str = Form(None), vacancy: int = Form(No
     "/candidate", response_description="List all candidates", response_model=List[CandidateModel]
 )
 async def list_candidates():
-    candidates = await db["candidates"].find().to_list(1000)
+    candidates = list(db["candidate"].find())
     return candidates
+
+
+@app.get(
+    "/interview", response_description="List all interview", response_model=List[InterviewModel]
+)
+async def list_interviews():
+    interviews = await db["interview"].find().to_list(1000)
+    return interviews
+
+
+@app.get(
+    "/candidate/appliedCandidates/{interview_id}", response_description="Get a single candidate",
+    response_model=List[CandidateModel]
+)
+async def show_applied_candidates(interview_id: str):
+    if candidates := list(db["candidate"].find({"interview":{"$elemMatch":{"interview_id":interview_id}}})):
+        return candidates
+    # if (candidate := db["candidate"].find_one({"_id": id})) is not None:
+    #     return candidate
+
+    raise HTTPException(status_code=404, detail=f"Candidate {interview_id} not found")
 
 
 @app.get(
