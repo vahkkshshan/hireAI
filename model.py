@@ -25,10 +25,11 @@ def predict(filename):
     detector = FER(mtcnn=True)
     raw_data = video.analyze(detector, display=False)
     df = video.to_pandas(raw_data)
-    df = df.iloc[:, 1:8].mean(axis=0)
-    df = df*100
-    df_mean=df.mean(axis=0).round(0).astype('int')
-    print(df)
-    return df_mean['angry'], df_mean['disgust'], df_mean['fear'], df_mean['happy'], df_mean['sad'], df_mean['surprise'],df_mean['neutral']
-
-
+    df = df.iloc[:, 1:8]
+    df = df * 100
+    df_mean = df.mean(axis=0).round(0).astype('int')
+    print(df_mean)
+    print(df_mean['angry'])
+    print("hi")
+    print(df_mean['neutral'])
+    return df_mean['angry'], df_mean['disgust'], df_mean['fear'], df_mean['happy'], df_mean['sad'], df_mean['surprise'], df_mean['neutral']
