@@ -1,27 +1,23 @@
-import json
-import os
 import shutil
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+from typing import Optional, List
 
-import aiofiles
-from fastapi import FastAPI, Body, HTTPException, status, Form, UploadFile, File, Query, Depends
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, Field, EmailStr, SecretStr, constr
 from bson import ObjectId
-from typing import Optional, List, OrderedDict
+from fastapi import FastAPI, Body, HTTPException, status, Form, UploadFile, File, Query, Depends
+from fastapi.encoders import jsonable_encoder
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel, Field, EmailStr
 from pymongo import MongoClient
+
 from awsConnector import upload_file_to_bucket
-import motor.motor_asyncio
 from hashing import Hash
 from jwttoken import create_access_token
-from oauth import get_current_user
-from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.middleware.cors import CORSMiddleware
-import base64
-
 from model import predict
+from oauth import get_current_user
+
+"""creation of FastAPI initiation"""
 
 app = FastAPI()
 origins = [
@@ -40,10 +36,14 @@ app.add_middleware(
 # db = client.college
 # export MONGODB_URL="mongodb+srv://vk26:qwerty123@testcluster.hmntz.mongodb.net/college?retryWrites=true&w=majority"
 
-
+###############################################################################################
+"""MongoDB connection initiation"""
 client = MongoClient(
     "mongodb+srv://vk26:qwerty123@cluster0.hmntz.mongodb.net/myFirstDatabase?retryWrites=true&w=majority")
 db = client.college
+
+###############################################################################################
+""" Creating Pydantic class models for modelling data to be stored inn MongoDB"""
 
 
 class PyObjectId(ObjectId):
@@ -123,7 +123,7 @@ class FacialScore(BaseModel):
     happy: int
     sad: int
     surprise: int
-    neutral:int
+    neutral: int
 
 
 class ScoringInfo(BaseModel):
@@ -195,33 +195,8 @@ class UpdateCandidateModel(BaseModel):
         }
 
 
-# class StudentModel(BaseModel):
-#     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
-#     name: str = Field(...)
-#     email: EmailStr = Field(...)
-#     course: str = Field(...)
-#     gpa: float = Field(..., le=4.0)
-#
-#     class Config:
-#         allow_population_by_field_name = True
-#         arbitrary_types_allowed = True
-#         json_encoders = {ObjectId: str}
-#         schema_extra = {
-#             "example": {
-#                 "name": "Jane Doe",
-#                 "email": "jdoe@example.com",
-#                 "course": "Experiments, Science, and Fashion in Nanophotonics",
-#                 "gpa": "3.0",
-#             }
-#         }
-#
-#
-# @app.post("/st", response_description="Add new student", response_model=StudentModel)
-# async def create_student(student: StudentModel = Body(...)):
-#     student = jsonable_encoder(student)
-#     new_student = await db["students"].insert_one(student)
-#     created_student = await db["students"].find_one({"_id": new_student.inserted_id})
-#     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_student)
+"""Below are backend REST API requests that get responses from front end and send back resposes to front end. Also its 
+   connected with AWS s3 bucket and mongodb"""
 
 
 @app.get("/")
@@ -229,24 +204,24 @@ def read_root(current_user: UserModel = Depends(get_current_user)):
     return {"data": "Hello OWrld"}
 
 
+###############################################################################################
+"""This API request is used to create admin who would be
+   able to access candidate dates and create interviews."""
+
+
 @app.post('/register', response_description="Add new user", response_model=UserModel)
 async def create_user(username: str = Form(None), company: str = Form(None), password: str = Form(None)):
-    # print(request.password)
-    # print(request)
-    # print(request.password)
     hashed_pass = Hash.bcrypt(password)
-    # user_object = dict(request)
     user = UserModel(username=username, company=company, password=hashed_pass)
     user = jsonable_encoder(user)
-    # print("hi dude")
-    # print(user_object["password"])
-    # user_object["password"] = hashed_pass
-    # print(user_object["password"])
 
     user_id = db["users"].insert_one(user)
     created_user = db["users"].find_one({"_id": user_id.inserted_id})
-    # print(user)
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_user)
+
+
+###############################################################################################
+"""This API is used by Admis and Candidates to login"""
 
 
 @app.post('/login')
@@ -266,6 +241,10 @@ async def login(request: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+###############################################################################################
+"""This API is used by candidates when they are creating a new profile"""
+
+
 @app.post("/candidate", response_description="Add new candidate", response_model=CandidateModel)
 async def create_candidate(username: str = Form(None), email: EmailStr = Form(None),
                            password: str = Form(None), firstname: str = Form(None), lastname: str = Form(None),
@@ -273,10 +252,6 @@ async def create_candidate(username: str = Form(None), email: EmailStr = Form(No
                            contact_number: str = Form(None), degree_programme: str = Form(None),
                            cv: UploadFile = File(None),
                            interview_name: str = Query(None, enum=list(db["interview"].find()))):
-    print("hey")
-    ins = list(db["interview"].find())
-    print(ins)
-    # print(interview_name[1])
     hashed_pass = Hash.bcrypt(password)
     candidate = CandidateModel(username=username, email=email, firstname=firstname, lastname=lastname,
                                password=hashed_pass,
@@ -288,23 +263,10 @@ async def create_candidate(username: str = Form(None), email: EmailStr = Form(No
     created_candidate = db["candidate"].find_one({"_id": new_candidate.inserted_id})
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_candidate)
 
-    # upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
-    # if upload_obj:
-    #     query = {"name": interview_name}
-    #     add_interview = db["interview"].find_one(query)
-    #     print(add_interview["name"])
-    #     # for doc in add_interview:
-    #     #     print(doc)
-    #     if add_interview['vacancy'] is not 0:
-    #         interview_info = InterviewInfo(interview_id=add_interview['_id'], interview_name=add_interview['name'])
-    #         candidate = CandidateModel(name=name, email=email, position=position,
-    #                                    cv="https://vk26bucket.s3.ap-south-1.amazonaws.com/cv" + cv.filename,
-    #                                    interview=[interview_info])
-    #         print(candidate)
-    #         candidate = jsonable_encoder(candidate)
-    #         new_candidate = await db["candidate"].insert_one(candidate)
-    #         created_candidate = await db["candidate"].find_one({"_id": new_candidate.inserted_id})
-    #         return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_candidate)
+
+###############################################################################################
+"""This API is used by Canididates when uploading their CV which is got from 
+   Front End to here and then pushed to AWS S3 and the record is saved in MongoDB"""
 
 
 @app.post("/candidate/cv_upload/{username}", response_description="Upload cv")
@@ -331,68 +293,47 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
             raise HTTPException(status_code=404, detail=f"Candidate {username} not found")
 
 
+###############################################################################################
+"""This API is used when candidate are applying for interviews and hence takes their id, interview id 
+   and the interview application videos from front end and its updated in mongoDB adna slo video uploaded to AWS S3"""
+
+
 @app.post("/interview/apply/{interview_id}/{user_id}", response_description="Apply job",
           response_model=UpdateCandidateModel)
 async def apply_interview(interview_id: str, user_id: str, video: UploadFile = File(None)):
-    print("lol here man")
-    print(interview_id)
-    print(type(interview_id))
     if (add_interview := db["interview"].find_one({"_id": interview_id})) is not None:
-        print("lol nnow here man")
-        print(add_interview)
-        destination = Path("videofile/subject.mp4")
 
-        # async with aiofiles.open("videofile/subject.mp4", 'wb') as out_file:
-        #     content = await video.read()  # async read
-        #     await out_file.write(content)  # async write
-        #     angry, disgust, fear, happy, sad, surprise = predict("/videofile/subject.mp4")
-        #     print(angry, disgust, fear, happy, sad, surprise)
+        destination = Path("videofile/subject.mp4")
 
         try:
             with destination.open("wb") as buffer:
                 shutil.copyfileobj(video.file, buffer)
-        except:
-            print("error")
+        except shutil.Error as err:
+            print(err)
 
-
-        # finally:
-        #     video.file.close()
-        # tmp_path=Path()
-        # try:
-        #     suffix = Path(video.filename).suffix
-        #     with NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        #         shutil.copyfileobj(video.file, tmp)
-        #         tmp_path = Path(tmp.name)
-        #         print(tmp_path)
-        # finally:
-        #     video.file.close()
-        # content= video.file.read()
-
-        angry, disgust, fear, happy, sad, surprise,neutral = predict(
+        # Predict method is the function that will use the video to generate emotional data from FER library model
+        angry, disgust, fear, happy, sad, surprise, neutral = predict(
             "videofile/subject.mp4")
-        print(angry, disgust, fear, happy, sad, surprise)
 
-        facial_score=FacialScore(angry=angry,disgust=disgust,sad=sad,fear=fear,surprise=surprise,happy=happy,neutral=neutral)
-        scores= ScoringInfo(facial_scores=facial_score,final_score="hired")
+        facial_score = FacialScore(angry=angry, disgust=disgust, sad=sad, fear=fear, surprise=surprise, happy=happy,
+                                   neutral=neutral)
+        scores = ScoringInfo(facial_scores=facial_score, final_score="hired")
 
+        # upload_file_to_bucket method is the function that will send video to AWS S3
         upload_obj = upload_file_to_bucket(video.file, 'vk26bucket', 'video', video.filename)
         if upload_obj:
 
+            # This InterviewInfo() will initialize the data object which will be uploaded to MongoDB
             interview_info = InterviewInfo(interview_id=add_interview['_id'],
                                            interview_name=add_interview['designation'],
                                            company_name=add_interview['company_name'],
                                            video_link="https://vk26bucket.s3.ap-south-1.amazonaws.com/video/" + video.filename,
                                            scores=scores)
-            # candidate = UpdateCandidateModel(interview=[interview_info])
 
             interview = {k: v for k, v in interview_info.dict().items() if v is not None}
-            print(interview)
-
+            # Below the interview data model for Candidate table is updated and pushed to mongodb based on candidate ID
             if len(interview) >= 1:
-                # update_result = db["candidate"].update_one({"_id": user_id},
-                #                                            {"$push": {"interview": {
-                #                                                "$ifNull": [{"$concatArrays": ["interview", interview]},
-                #                                                            interview]}}})
+
                 update_result = db["candidate"].update_one({"_id": user_id},
                                                            {"$push": {"interview": interview}})
 
@@ -407,17 +348,25 @@ async def apply_interview(interview_id: str, user_id: str, video: UploadFile = F
     raise HTTPException(status_code=404, detail=f"Interview {interview_id} not found")
 
 
+###############################################################################################
+"""This API is used for creating interviews by admins """
+
+
 @app.post("/interview", response_description="Add new interview", response_model=InterviewModel)
 async def create_interview(designation: str = Form(None), vacancy: int = Form(None), company_name: str = Form(None),
                            description: str = Form(None)):
-    print("hey")
+    # Interview Data Model Object is created for Interview Table
     interview = InterviewModel(designation=designation, vacancy=vacancy, company_name=company_name,
                                description=description)
-    print(interview)
     interview = jsonable_encoder(interview)
+    # The interview is inserted into MongoDB here.
     new_interview = db["interview"].insert_one(interview)
     created_interview = db["interview"].find_one({"_id": new_interview.inserted_id})
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_interview)
+
+
+###############################################################################################
+"""This API is used to GET all candiates information from mongoDB and is sent to Front End"""
 
 
 @app.get(
@@ -428,12 +377,20 @@ async def list_candidates():
     return candidates
 
 
+###############################################################################################
+"""This API is used to GET all interview information from MongoDB and sent to Front End"""
+
+
 @app.get(
     "/interview", response_description="List all interview", response_model=List[InterviewModel]
 )
 async def list_interviews():
     interviews = list(db["interview"].find())
     return interviews
+
+
+###############################################################################################
+"""This API is used to get all applied candidates to a single interview information from mongoDB and sent to Front End"""
 
 
 @app.get(
@@ -443,10 +400,12 @@ async def list_interviews():
 async def show_applied_candidates(interview_id: str):
     if candidates := list(db["candidate"].find({"interview": {"$elemMatch": {"interview_id": interview_id}}})):
         return candidates
-    # if (candidate := db["candidate"].find_one({"_id": id})) is not None:
-    #     return candidate
 
     raise HTTPException(status_code=404, detail=f"Candidate {interview_id} not found")
+
+
+###############################################################################################
+"""This API is used to get a single candidate information from mongoDB and sennt to Front End"""
 
 
 @app.get(
@@ -459,23 +418,26 @@ async def show_candidate(id: str):
     raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
 
 
+###############################################################################################
+"""This API is used to get a single interview information from mongoDB and sent to Front End"""
+
+
 @app.get(
     "/interview/{id}", response_description="Get a single interview", response_model=InterviewModel
 )
 async def show_interview(id: str):
     if (interview := db["interview"].find_one({"_id": id})) is not None:
-        print(interview)
         return interview
 
     raise HTTPException(status_code=404, detail=f"Interview {id} not found")
 
 
+###############################################################################################
+"""This API is used to update a single candidate information in mongoDB"""
+
+
 @app.put("/candidate/{id}", response_description="Update a candidate", response_model=CandidateModel)
 async def update_candidate(id: str, candidate: UpdateCandidateModel = Body(...)):
-    # id: str, username: str = Form(None), password: str = Form(None), email: str = Form(None),
-    # position: str = Form(None),firstname:str = Form(None), lastname:str = Form(None),contact_number:str = Form(None),
-    # university:str = Form(None), degree_programme:str = Form(None),
-    # cv: UploadFile = File(None)
     candidate = {k: v for k, v in candidate.dict().items() if v is not None}
 
     if len(candidate) >= 1:
@@ -493,33 +455,8 @@ async def update_candidate(id: str, candidate: UpdateCandidateModel = Body(...))
         raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
 
 
-# if cv is not None:
-#     upload_obj = upload_file_to_bucket(cv.file, 'vk26bucket', 'cv', cv.filename)
-#     if upload_obj:
-#         # query = {"name": interview_name}
-#         # add_interview = db["interview"].find_one(query)
-#         # print(add_interview["name"])
-#         # for doc in add_interview:
-#         #     print(doc)
-#         # if add_interview['vacancy'] is not 0:
-#         #     interview_info = InterviewInfo(interview_id=add_interview['_id'], interview_name=add_interview['name'])
-#         candidate = UpdateCandidateModel(username=username, email=email, position=position,
-#                                          cv="https://vk26bucket.s3.ap-south-1.amazonaws.com/cv" + cv.filename)
-#         candidate = {k: v for k, v in candidate.dict().items() if v is not None}
-#
-#         if len(candidate) >= 1:
-#             update_result = await db["candidate"].update_one({"_id": id}, {"$set": candidate})
-#
-#             if update_result.modified_count == 1:
-#                 if (
-#                         updated_candidate := await db["candidate"].find_one({"_id": id})
-#                 ) is not None:
-#                     return updated_candidate
-#
-#         if (existing_candidate := await db["candidate"].find_one({"_id": id})) is not None:
-#             return existing_candidate
-#
-#         raise HTTPException(status_code=404, detail=f"Candidate {id} not found")
+###############################################################################################
+"""This API is used to delete a single candidate information from mongoDB"""
 
 
 @app.delete("/candidate/{id}", response_description="Delete a candidate")
