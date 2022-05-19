@@ -314,6 +314,7 @@ async def apply_scores_update(add_interview: dict, user_id: str, interview_id: s
     # Predict method is the function that will use the video to generate emotional data from FER library model
     angry, disgust, fear, happy, sad, surprise, neutral, pos_neg = predict(
         "videofile/subject.mp4")
+    print("pos_neg",pos_neg)
     facial_score = FacialScore(angry=angry, disgust=disgust, sad=sad, fear=fear, surprise=surprise, happy=happy,
                                neutral=neutral, pos_neg=pos_neg)
     final_score = ""

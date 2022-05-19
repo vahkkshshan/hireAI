@@ -18,5 +18,4 @@ def predict(filename):
 
     df_pos_neg = (((df_positive - df_negative) / df_positive) * 100).round(0).astype('int')
 
-    return df_mean['angry'], df_mean['disgust'], df_mean['fear'], df_mean['happy'], df_mean['sad'], df_mean['surprise'], \
-           df_mean['neutral'], df_pos_neg
+    return df_mean['angry'], df_mean['disgust'], df_mean['fear'], df_mean['happy'], df_mean['sad'], df_mean['surprise'], df_mean['neutral'], df_pos_neg
