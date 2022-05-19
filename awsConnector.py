@@ -39,12 +39,12 @@ def upload_file_to_bucket(file_obj, bucket, folder, object_name=None):
     if object_name is None:
         object_name = file_obj
 
-    print("i am here")
+    # print("i am here")
     # Upload the file
-    print(bucket)
-    print(file_obj)
-    print(f"{folder}/{object_name}")
-    print("i am here 2")
+    # print(bucket)
+    # print(file_obj)
+    # print(f"{folder}/{object_name}")
+    # print("i am here 2")
 
     try:
         # with open("files", "rb") as f:

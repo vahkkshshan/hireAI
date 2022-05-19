@@ -300,6 +300,7 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
 
 
 def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, video: UploadFile):
+    print("inside method")
     destination = Path("videofile/subject.mp4")
 
     try:
