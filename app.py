@@ -299,10 +299,11 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
    and the interview application videos from front end and its updated in mongoDB adna slo video uploaded to AWS S3"""
 
 
-def apply_scores_update(add_interview, user_id, interview_id,video:UploadFile):
+def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, video: UploadFile):
     destination = Path("videofile/subject.mp4")
 
     try:
+        print("inside")
         with destination.open("wb") as buffer:
             shutil.copyfileobj(video.file, buffer)
     except shutil.Error as err:
@@ -344,8 +345,8 @@ def apply_scores_update(add_interview, user_id, interview_id,video:UploadFile):
 
 
 @app.post("/interview/apply/{interview_id}/{user_id}", response_description="Apply job")
-async def apply_interview(interview_id: str, user_id: str,background_tasks:BackgroundTasks, video: UploadFile = File(None)):
-
+async def apply_interview(interview_id: str, user_id: str, background_tasks: BackgroundTasks,
+                          video: UploadFile = File(None)):
     if (add_interview := db["interview"].find_one({"_id": interview_id})) is not None:
 
         # destination = Path("videofile/subject.mp4")
@@ -372,7 +373,8 @@ async def apply_interview(interview_id: str, user_id: str,background_tasks:Backg
         # upload_file_to_bucket method is the function that will send video to AWS S3
         upload_obj = upload_file_to_bucket(video.file, 'vk26bucket', 'video', video.filename)
         if upload_obj:
-            background_tasks.add_task(apply_scores_update,add_interview=add_interview, user_id=user_id, interview_id=interview_id,video=video)
+            background_tasks.add_task(apply_scores_update, add_interview=add_interview, user_id=user_id,
+                                      interview_id=interview_id, video=video)
             # # This InterviewInfo() will initialize the data object which will be uploaded to MongoDB
             # interview_info = InterviewInfo(interview_id=add_interview['_id'],
             #                                interview_name=add_interview['designation'],
