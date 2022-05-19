@@ -22,4 +22,4 @@ def predict(filename):
 
     print(df_positive,"positivity")
 
-    return df_mean['angry'], df_mean['disgust'], df_mean['fear'], df_mean['happy'], df_mean['sad'], df_mean['surprise'], df_mean['neutral'], df_pos_neg
+    return df_mean['angry'], df_mean['disgust'], df_mean['fear'], df_mean['happy'], df_mean['sad'], df_mean['surprise'], df_mean['neutral']
