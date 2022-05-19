@@ -124,7 +124,7 @@ class FacialScore(BaseModel):
     sad: int
     surprise: int
     neutral: int
-    # pos_neg: int
+    pos_neg: int
 
 
 class ScoringInfo(BaseModel):
@@ -312,12 +312,11 @@ def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, vi
     #     print(err)
 
     # Predict method is the function that will use the video to generate emotional data from FER library model
-    angry, disgust, fear, happy, sad, surprise, neutral = predict(
+    angry, disgust, fear, happy, sad, surprise, neutral, pos_neg = predict(
         "videofile/subject.mp4")
-    pos_neg=60
     # print("pos_neg",pos_neg)
     facial_score = FacialScore(angry=angry, disgust=disgust, sad=sad, fear=fear, surprise=surprise, happy=happy,
-                               neutral=neutral)
+                               neutral=neutral,pos_neg=pos_neg)
     final_score = ""
     if pos_neg > 50:
         final_score = "hired"
