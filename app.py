@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional, List
 
 from bson import ObjectId
-from fastapi import FastAPI, Body, HTTPException, status, Form, UploadFile, File, Query, Depends
+from fastapi import FastAPI, Body, HTTPException, status, Form, UploadFile, File, Query, Depends, BackgroundTasks
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -124,6 +124,7 @@ class FacialScore(BaseModel):
     sad: int
     surprise: int
     neutral: int
+    pos_neg: int
 
 
 class ScoringInfo(BaseModel):
@@ -298,53 +299,104 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
    and the interview application videos from front end and its updated in mongoDB adna slo video uploaded to AWS S3"""
 
 
-@app.post("/interview/apply/{interview_id}/{user_id}", response_description="Apply job",
-          response_model=UpdateCandidateModel)
-async def apply_interview(interview_id: str, user_id: str, video: UploadFile = File(None)):
+def apply_scores_update(add_interview, user_id, interview_id,video:UploadFile):
+    destination = Path("videofile/subject.mp4")
+
+    try:
+        with destination.open("wb") as buffer:
+            shutil.copyfileobj(video.file, buffer)
+    except shutil.Error as err:
+        print(err)
+
+    # Predict method is the function that will use the video to generate emotional data from FER library model
+    angry, disgust, fear, happy, sad, surprise, neutral, pos_neg = predict(
+        "videofile/subject.mp4")
+    facial_score = FacialScore(angry=angry, disgust=disgust, sad=sad, fear=fear, surprise=surprise, happy=happy,
+                               neutral=neutral, pos_neg=pos_neg)
+    final_score = ""
+    if pos_neg > 50:
+        final_score = "hired"
+    else:
+        final_score = "rejected"
+    scores = ScoringInfo(facial_scores=facial_score, final_score=final_score)
+    # This InterviewInfo() will initialize the data object which will be uploaded to MongoDB
+    interview_info = InterviewInfo(interview_id=add_interview['_id'],
+                                   interview_name=add_interview['designation'],
+                                   company_name=add_interview['company_name'],
+                                   video_link="https://vk26bucket.s3.ap-south-1.amazonaws.com/video/" + video.filename,
+                                   scores=scores)
+
+    interview = {k: v for k, v in interview_info.dict().items() if v is not None}
+    # Below the interview data model for Candidate table is updated and pushed to mongodb based on candidate ID
+    if len(interview) >= 1:
+
+        update_result = db["candidate"].update_one({"_id": user_id},
+                                                   {"$push": {"interview": interview}})
+
+        if update_result.modified_count == 1:
+            if (updated_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
+                return updated_candidate
+
+        if (existing_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
+            return existing_candidate
+
+        raise HTTPException(status_code=404, detail=f"Interview {interview_id} and {user_id} not found")
+
+
+@app.post("/interview/apply/{interview_id}/{user_id}", response_description="Apply job")
+async def apply_interview(interview_id: str, user_id: str,background_tasks:BackgroundTasks, video: UploadFile = File(None)):
+
     if (add_interview := db["interview"].find_one({"_id": interview_id})) is not None:
 
-        destination = Path("videofile/subject.mp4")
-
-        try:
-            with destination.open("wb") as buffer:
-                shutil.copyfileobj(video.file, buffer)
-        except shutil.Error as err:
-            print(err)
-
-        # Predict method is the function that will use the video to generate emotional data from FER library model
-        angry, disgust, fear, happy, sad, surprise, neutral = predict(
-            "videofile/subject.mp4")
-
-        facial_score = FacialScore(angry=angry, disgust=disgust, sad=sad, fear=fear, surprise=surprise, happy=happy,
-                                   neutral=neutral)
-        scores = ScoringInfo(facial_scores=facial_score, final_score="hired")
+        # destination = Path("videofile/subject.mp4")
+        #
+        # try:
+        #     with destination.open("wb") as buffer:
+        #         shutil.copyfileobj(video.file, buffer)
+        # except shutil.Error as err:
+        #     print(err)
+        #
+        # # Predict method is the function that will use the video to generate emotional data from FER library model
+        # angry, disgust, fear, happy, sad, surprise, neutral, pos_neg = predict(
+        #     "videofile/subject.mp4")
+        #
+        # facial_score = FacialScore(angry=angry, disgust=disgust, sad=sad, fear=fear, surprise=surprise, happy=happy,
+        #                            neutral=neutral, pos_neg=pos_neg)
+        # final_score = ""
+        # if pos_neg > 50:
+        #     final_score = "hired"
+        # else:
+        #     final_score = "rejected"
+        # scores = ScoringInfo(facial_scores=facial_score, final_score=final_score)
 
         # upload_file_to_bucket method is the function that will send video to AWS S3
         upload_obj = upload_file_to_bucket(video.file, 'vk26bucket', 'video', video.filename)
         if upload_obj:
+            background_tasks.add_task(apply_scores_update,add_interview=add_interview, user_id=user_id, interview_id=interview_id,video=video)
+            # # This InterviewInfo() will initialize the data object which will be uploaded to MongoDB
+            # interview_info = InterviewInfo(interview_id=add_interview['_id'],
+            #                                interview_name=add_interview['designation'],
+            #                                company_name=add_interview['company_name'],
+            #                                video_link="https://vk26bucket.s3.ap-south-1.amazonaws.com/video/" + video.filename,
+            #                                scores=scores)
+            #
+            # interview = {k: v for k, v in interview_info.dict().items() if v is not None}
+            # # Below the interview data model for Candidate table is updated and pushed to mongodb based on candidate ID
+            # if len(interview) >= 1:
+            #
+            #     update_result = db["candidate"].update_one({"_id": user_id},
+            #                                                {"$push": {"interview": interview}})
+            #
+            #     if update_result.modified_count == 1:
+            #         if (updated_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
+            #             return updated_candidate
+            #
+            #     if (existing_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
+            #         return existing_candidate
+            #
+            #     raise HTTPException(status_code=404, detail=f"Interview {interview_id} and {user_id} not found")
+            return JSONResponse(status_code=status.HTTP_201_CREATED)
 
-            # This InterviewInfo() will initialize the data object which will be uploaded to MongoDB
-            interview_info = InterviewInfo(interview_id=add_interview['_id'],
-                                           interview_name=add_interview['designation'],
-                                           company_name=add_interview['company_name'],
-                                           video_link="https://vk26bucket.s3.ap-south-1.amazonaws.com/video/" + video.filename,
-                                           scores=scores)
-
-            interview = {k: v for k, v in interview_info.dict().items() if v is not None}
-            # Below the interview data model for Candidate table is updated and pushed to mongodb based on candidate ID
-            if len(interview) >= 1:
-
-                update_result = db["candidate"].update_one({"_id": user_id},
-                                                           {"$push": {"interview": interview}})
-
-                if update_result.modified_count == 1:
-                    if (updated_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
-                        return updated_candidate
-
-                if (existing_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
-                    return existing_candidate
-
-                raise HTTPException(status_code=404, detail=f"Interview {interview_id} and {user_id} not found")
     raise HTTPException(status_code=404, detail=f"Interview {interview_id} not found")
 
 
