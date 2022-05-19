@@ -299,7 +299,7 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
    and the interview application videos from front end and its updated in mongoDB adna slo video uploaded to AWS S3"""
 
 
-async def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, video: UploadFile):
+def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, video: UploadFile):
     # print("inside method")
     # destination = Path("videofile/subject.mp4")
     # print("video file uod",video.file)
