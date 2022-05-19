@@ -299,17 +299,17 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
    and the interview application videos from front end and its updated in mongoDB adna slo video uploaded to AWS S3"""
 
 
-def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, video: UploadFile):
+async def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, video: UploadFile):
     print("inside method")
-    # destination = Path("videofile/subject.mp4")
-    # print("video file uod",video.file)
-    #
-    # try:
-    #     print("inside")
-    #     with destination.open("wb") as buffer:
-    #         shutil.copyfileobj(video.file, buffer)
-    # except shutil.Error as err:
-    #     print(err)
+    destination = Path("videofile/subject.mp4")
+    print("video file uod",video.file)
+
+    try:
+        print("inside")
+        with destination.open("wb") as buffer:
+            shutil.copyfileobj(video.file, buffer)
+    except shutil.Error as err:
+        print(err)
 
     # Predict method is the function that will use the video to generate emotional data from FER library model
     angry, disgust, fear, happy, sad, surprise, neutral, pos_neg = predict(
@@ -351,14 +351,14 @@ async def apply_interview(interview_id: str, user_id: str, background_tasks: Bac
                           video: UploadFile = File(None)):
     if (add_interview := db["interview"].find_one({"_id": interview_id})) is not None:
 
-        destination = Path("videofile/subject.mp4")
-
-        try:
-            with destination.open("wb") as buffer:
-                shutil.copyfileobj(video.file, buffer)
-        except shutil.Error as err:
-            print(err)
-        print("video file int",video.file)
+        # destination = Path("videofile/subject.mp4")
+        #
+        # try:
+        #     with destination.open("wb") as buffer:
+        #         shutil.copyfileobj(video.file, buffer)
+        # except shutil.Error as err:
+        #     print(err)
+        # print("video file int",video.file)
         #
         # # Predict method is the function that will use the video to generate emotional data from FER library model
         # angry, disgust, fear, happy, sad, surprise, neutral, pos_neg = predict(
