@@ -23,7 +23,7 @@ def cnn_example():
     sound = AudioSegment.from_wav(
         "/Users/vahkksh/Documents/thivvyan/Sentiment-Analysis-On-Voice-Data/speechemotionrecognition/testvideo_fer.wav")
     sound = sound.set_channels(1)
-    sound = sound.set_frame_rate(16)
+    sound = sound.set_frame_rate(16000)
 
     chunk_length_ms = 2000  # pydub calculates in millisec
     chunks = make_chunks(sound, chunk_length_ms)  # Make chunks of one sec

@@ -32,10 +32,13 @@ passlib~=1.7.4
 aiofiles==0.6.0
 fer==22.4.0
 
-numpy
+numpy~=1.22.3
 h5py>=2.7.1
 Keras>=2.1.5
 scipy>=1.0.1
-sklearn
+sklearn~=0.0
 speechpy>=2.2
 pandas>=0.24.0
+moviepy~=1.0.3
+pydub~=0.25.1
+scikit-learn~=1.1.1

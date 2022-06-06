@@ -1,7 +1,11 @@
 import shutil
 from pathlib import Path
 from typing import Optional, List
-
+from moviepy.editor import *
+from pydub import AudioSegment
+from pydub.utils import make_chunks
+from os import listdir
+from os.path import isfile, join
 from bson import ObjectId
 from fastapi import FastAPI, Body, HTTPException, status, Form, UploadFile, File, Query, Depends, BackgroundTasks
 from fastapi.encoders import jsonable_encoder
@@ -16,6 +20,9 @@ from hashing import Hash
 from jwttoken import create_access_token
 from model import predict
 from oauth import get_current_user
+from examples.common import extract_data
+from speechemotionrecognition.dnn import CNN
+from speechemotionrecognition.utilities import get_feature_vector_from_mfcc
 
 """creation of FastAPI initiation"""
 
@@ -127,8 +134,18 @@ class FacialScore(BaseModel):
     pos_neg: int
 
 
+class SentimentalScore(BaseModel):
+    angry: int
+    happy: int
+    sad: int
+    neutral: int
+    pos_neg: int
+
+
 class ScoringInfo(BaseModel):
     facial_scores: FacialScore
+    sentimental_scores:SentimentalScore
+    overall_score:int
     final_score: str
 
 
@@ -314,15 +331,77 @@ def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, vi
     # Predict method is the function that will use the video to generate emotional data from FER library model
     angry, disgust, fear, happy, sad, surprise, neutral, pos_neg = predict(
         "videofile/subject.mp4")
+
+    audioclip = AudioFileClip(
+        "videofile/subject.mp4")
+    audioclip.write_audiofile(
+        "videofile/subject.wav")
+    sound = AudioSegment.from_wav(
+        "videofile/subject.wav")
+    sound = sound.set_channels(1)
+    sound = sound.set_frame_rate(16000)
+
+    chunk_length_ms = 2000  # pydub calculates in millisec
+    chunks = make_chunks(sound, chunk_length_ms)  # Make chunks of one sec
+    for i, chunk in enumerate(chunks):
+        chunk_name = "output/{0}.wav".format(i)
+        print("exporting", chunk_name)
+        chunk.export(chunk_name, format="wav")
+
+    onlyfiles = [f for f in listdir("output") if isfile(join("output", f))]
+    print(onlyfiles)
+
+    to_flatten = False
+    x_train, x_test, y_train, y_test, num_labels = extract_data(
+        flatten=to_flatten)
+
+    model = CNN(input_shape=x_train[0].shape,
+                num_classes=num_labels)
+    model.load_model(
+        to_load="models/best_model_CNN_13.h5")
+    # model.train(x_train, y_train, x_test, y_test_train)
+    model.evaluate(x_test, y_test)
+
+    pred_list = []
+    for file in onlyfiles:
+        pred_list.append(model.predict_one(
+            get_feature_vector_from_mfcc("output/{}".format(file), flatten=to_flatten)))
+
+    neutral_vibes = (pred_list.count(0) / len(pred_list)) * 100
+    angry_vibes = (pred_list.count(1) / len(pred_list)) * 100
+    happy_vibes = (pred_list.count(2) / len(pred_list)) * 100
+    sad_vibes = (pred_list.count(3) / len(pred_list)) * 100
+    positive_vibes = round((neutral_vibes + happy_vibes) / 2)
+    negative_vibes = round((angry_vibes + sad_vibes) / 2)
+    pos_neg_vibes = round(((positive_vibes - negative_vibes) / positive_vibes) * 100)
+    if pos_neg_vibes < 0:
+        pos_neg_vibes = 0
+
+    print(neutral_vibes, 'neutral')
+    print(angry_vibes, 'angry')
+    print(happy_vibes, 'happy')
+    print(sad_vibes, 'sad')
+
+    print(positive_vibes, 'positibe')
+    print(negative_vibes, 'nega')
+    print(positive_vibes * 100, "p%")
+    print(negative_vibes * 100, 'n%')
+    print(pos_neg_vibes, 'pos_neg')
+
+    print('CNN Done')
+
     # print("pos_neg",pos_neg)
+    sentimental_score=SentimentalScore(angry=angry_vibes,neutral=neutral_vibes,happy=happy_vibes,sad=sad_vibes,pos_neg=pos_neg_vibes)
     facial_score = FacialScore(angry=angry, disgust=disgust, sad=sad, fear=fear, surprise=surprise, happy=happy,
-                               neutral=neutral,pos_neg=pos_neg)
+                               neutral=neutral, pos_neg=pos_neg)
+    overall_score = (pos_neg + pos_neg_vibes) / 2
+
     final_score = ""
-    if pos_neg > 50:
+    if overall_score > 50:
         final_score = "hired"
     else:
         final_score = "rejected"
-    scores = ScoringInfo(facial_scores=facial_score, final_score=final_score)
+    scores = ScoringInfo(facial_scores=facial_score, sentimental_scores=sentimental_score,overall_score=overall_score,final_score=final_score)
     # This InterviewInfo() will initialize the data object which will be uploaded to MongoDB
     interview_info = InterviewInfo(interview_id=add_interview['_id'],
                                    interview_name=add_interview['designation'],
@@ -359,7 +438,7 @@ async def apply_interview(interview_id: str, user_id: str, background_tasks: Bac
                 shutil.copyfileobj(video.file, buffer)
         except shutil.Error as err:
             print(err)
-        print("video file int",video.file)
+        print("video file int", video.file)
         #
         # # Predict method is the function that will use the video to generate emotional data from FER library model
         # angry, disgust, fear, happy, sad, surprise, neutral, pos_neg = predict(
