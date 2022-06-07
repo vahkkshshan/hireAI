@@ -346,11 +346,13 @@ def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, vi
     chunk_length_ms = 2000  # pydub calculates in millisec
     chunks = make_chunks(sound, chunk_length_ms)  # Make chunks of one sec
     for i, chunk in enumerate(chunks):
-        chunk_name = "output/{0}.wav".format(i)
+        chunk_name = "audio/{0}.wav".format(i)
         print("exporting", chunk_name)
         chunk.export(chunk_name, format="wav")
 
-    onlyfiles = [f for f in listdir("output") if isfile(join("output", f))]
+    sound.export("123.wav", format="wav")
+
+    onlyfiles = [f for f in listdir("audio") if isfile(join("audio", f))]
     print(onlyfiles)
 
     to_flatten = False
@@ -368,7 +370,7 @@ def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, vi
     pred_list = []
     for file in onlyfiles:
         pred_list.append(model.predict_one(
-            get_feature_vector_from_mfcc("output/{}".format(file), flatten=to_flatten)))
+            get_feature_vector_from_mfcc("audio/{}".format(file), flatten=to_flatten)))
 
     neutral_vibes = (pred_list.count(0) / len(pred_list)) * 100
     angry_vibes = (pred_list.count(1) / len(pred_list)) * 100
@@ -376,6 +378,12 @@ def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, vi
     sad_vibes = (pred_list.count(3) / len(pred_list)) * 100
     positive_vibes = round((neutral_vibes + happy_vibes) / 2)
     negative_vibes = round((angry_vibes + sad_vibes) / 2)
+    print(positive_vibes, 'positibe')
+    print(negative_vibes, 'nega')
+    if positive_vibes == 0:
+        positive_vibes = 1
+    print(positive_vibes, 'positibe')
+    print(negative_vibes, 'nega')
     pos_neg_vibes = round(((positive_vibes - negative_vibes) / positive_vibes) * 100)
     if pos_neg_vibes < 0:
         pos_neg_vibes = 0
