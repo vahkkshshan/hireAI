@@ -139,6 +139,8 @@ class SentimentalScore(BaseModel):
     happy: int
     sad: int
     neutral: int
+    pos:int
+    neg:int
     pos_neg: int
 
 
@@ -391,7 +393,8 @@ def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, vi
     print('CNN Done')
 
     # print("pos_neg",pos_neg)
-    sentimental_score=SentimentalScore(angry=angry_vibes,neutral=neutral_vibes,happy=happy_vibes,sad=sad_vibes,pos_neg=pos_neg_vibes)
+    sentimental_score=SentimentalScore(angry=angry_vibes,neutral=neutral_vibes,happy=happy_vibes,sad=sad_vibes,pos=positive_vibes,
+                                       neg=negative_vibes,pos_neg=pos_neg_vibes)
     facial_score = FacialScore(angry=angry, disgust=disgust, sad=sad, fear=fear, surprise=surprise, happy=happy,
                                neutral=neutral, pos_neg=pos_neg)
     overall_score = (pos_neg + pos_neg_vibes) / 2
