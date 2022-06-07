@@ -354,8 +354,8 @@ def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, vi
     print(onlyfiles)
 
     to_flatten = False
-    x_train, x_test, y_train, y_test, num_labels = extract_data(
-        flatten=to_flatten)
+    # x_train, x_test, y_train, y_test, num_labels = extract_data(
+    #     flatten=to_flatten)
 
     shape=(198,39)
     model = CNN(input_shape=shape,
