@@ -357,8 +357,9 @@ def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, vi
     x_train, x_test, y_train, y_test, num_labels = extract_data(
         flatten=to_flatten)
 
-    model = CNN(input_shape=x_train[0].shape,
-                num_classes=num_labels)
+    shape=(198,39)
+    model = CNN(input_shape=shape,
+                num_classes=4)
     model.load_model(
         to_load="models/best_model_CNN_13.h5")
     # model.train(x_train, y_train, x_test, y_test_train)
