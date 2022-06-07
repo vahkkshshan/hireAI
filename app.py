@@ -363,7 +363,7 @@ def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, vi
     model.load_model(
         to_load="models/best_model_CNN_13.h5")
     # model.train(x_train, y_train, x_test, y_test_train)
-    model.evaluate(x_test, y_test)
+    # model.evaluate(x_test, y_test)
 
     pred_list = []
     for file in onlyfiles:
