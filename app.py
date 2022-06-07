@@ -319,16 +319,7 @@ async def upload_cv(username: str, cv: UploadFile = File(None)):
 
 
 def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, video: UploadFile):
-    # print("inside method")
-    # destination = Path("videofile/subject.mp4")
-    # print("video file uod",video.file)
-    #
-    # try:
-    #     print("inside")
-    #     with destination.open("wb") as buffer:
-    #         shutil.copyfileobj(video.file, buffer)
-    # except shutil.Error as err:
-    #     print(err)
+
 
     # Predict method is the function that will use the video to generate emotional data from FER library model
     angry, disgust, fear, happy, sad, surprise, neutral, pos_neg = predict(
@@ -401,7 +392,6 @@ def apply_scores_update(add_interview: dict, user_id: str, interview_id: str, vi
 
     print('CNN Done')
 
-    # print("pos_neg",pos_neg)
     sentimental_score=SentimentalScore(angry=angry_vibes,neutral=neutral_vibes,happy=happy_vibes,sad=sad_vibes,pos=positive_vibes,
                                        neg=negative_vibes,pos_neg=pos_neg_vibes)
     facial_score = FacialScore(angry=angry, disgust=disgust, sad=sad, fear=fear, surprise=surprise, happy=happy,
@@ -451,47 +441,14 @@ async def apply_interview(interview_id: str, user_id: str, background_tasks: Bac
         except shutil.Error as err:
             print(err)
         print("video file int", video.file)
-        #
-        # # Predict method is the function that will use the video to generate emotional data from FER library model
-        # angry, disgust, fear, happy, sad, surprise, neutral, pos_neg = predict(
-        #     "videofile/subject.mp4")
-        #
-        # facial_score = FacialScore(angry=angry, disgust=disgust, sad=sad, fear=fear, surprise=surprise, happy=happy,
-        #                            neutral=neutral, pos_neg=pos_neg)
-        # final_score = ""
-        # if pos_neg > 50:
-        #     final_score = "hired"
-        # else:
-        #     final_score = "rejected"
-        # scores = ScoringInfo(facial_scores=facial_score, final_score=final_score)
+
 
         # upload_file_to_bucket method is the function that will send video to AWS S3
         upload_obj = upload_file_to_bucket(video.file, 'vk26bucket', 'video', video.filename)
         if upload_obj:
             background_tasks.add_task(apply_scores_update, add_interview=add_interview, user_id=user_id,
                                       interview_id=interview_id, video=video)
-            # # This InterviewInfo() will initialize the data object which will be uploaded to MongoDB
-            # interview_info = InterviewInfo(interview_id=add_interview['_id'],
-            #                                interview_name=add_interview['designation'],
-            #                                company_name=add_interview['company_name'],
-            #                                video_link="https://vk26bucket.s3.ap-south-1.amazonaws.com/video/" + video.filename,
-            #                                scores=scores)
-            #
-            # interview = {k: v for k, v in interview_info.dict().items() if v is not None}
-            # # Below the interview data model for Candidate table is updated and pushed to mongodb based on candidate ID
-            # if len(interview) >= 1:
-            #
-            #     update_result = db["candidate"].update_one({"_id": user_id},
-            #                                                {"$push": {"interview": interview}})
-            #
-            #     if update_result.modified_count == 1:
-            #         if (updated_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
-            #             return updated_candidate
-            #
-            #     if (existing_candidate := db["candidate"].find_one({"_id": user_id})) is not None:
-            #         return existing_candidate
-            #
-            #     raise HTTPException(status_code=404, detail=f"Interview {interview_id} and {user_id} not found")
+
             return JSONResponse(status_code=status.HTTP_201_CREATED)
 
     raise HTTPException(status_code=404, detail=f"Interview {interview_id} not found")
